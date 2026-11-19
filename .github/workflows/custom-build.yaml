@@ -115,3 +115,27 @@ jobs:
             build/windows/**/runner/Release/data/icudtl.dat
           if-no-files-found: warn
           overwrite: true
+
+      # artifact 下载要走鉴权、还限速；打成 zip 发到固定 tag 的 release，
+      # 就能用公开镜像直连拉（例如 https://ghfast.top/<release 地址>）
+      - name: Pack hotfiles
+        shell: pwsh
+        run: |
+          $src = "build/windows/x64/runner/Release"
+          New-Item -ItemType Directory -Force -Path out | Out-Null
+          Compress-Archive -Path "$src/FlClash.exe","$src/data/app.so","$src/data/icudtl.dat" `
+            -DestinationPath out/hotfiles.zip -Force
+          Get-Item out/hotfiles.zip | Select-Object Name, Length
+
+      - name: Publish hotfiles to release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: custom-latest
+          name: custom build (latest)
+          body: |
+            自动构建产物（跟随上游 main + 自定义功能）。
+            hotfiles.zip 用于就地升级：FlClash.exe + data/app.so + data/icudtl.dat
+            镜像下载示例：https://ghfast.top/https://github.com/MARYCOMPLEX/FlClash/releases/download/custom-latest/hotfiles.zip
+          files: out/hotfiles.zip
+          prerelease: true
+          make_latest: false
