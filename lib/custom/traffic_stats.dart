@@ -80,6 +80,9 @@ class TrafficStats with CoreEventListener, WidgetsBindingObserver {
   final Map<String, Map<String, int>> _last = <String, Map<String, int>>{};
   final Map<String, _Bucket> _days = <String, _Bucket>{};
 
+  /// UI 监听这个，值变化时刷新页面
+  final ValueNotifier<int> revision = ValueNotifier<int>(0);
+
   File? _file;
   HttpServer? _server;
   Timer? _timer;
@@ -241,6 +244,7 @@ class TrafficStats with CoreEventListener, WidgetsBindingObserver {
     }
     if (changed) {
       _dirty = true;
+      revision.value++;
     }
     if (_last.length > 2000) {
       final alive = traffic.keys.toSet();
@@ -249,16 +253,36 @@ class TrafficStats with CoreEventListener, WidgetsBindingObserver {
     }
   }
 
-  String _snapshot() {
-    final days = <String, Object>{
-      for (final entry in _days.entries) entry.key: entry.value.toJson(),
-    };
-    return jsonEncode(<String, Object>{
+  /// 给 UI 用的结构化快照
+  Map<String, Object> dataMap() {
+    return <String, Object>{
       'today': _dayKey(),
       'live': _live,
-      'days': days,
-    });
+      'days': <String, Object>{
+        for (final entry in _days.entries) entry.key: entry.value.toJson(),
+      },
+    };
   }
+
+  /// 某一天的明细：{'domains': {name: [up, down]}, 'procs': ..., 'exits': ...}
+  Map<String, Map<String, List<int>>> dayDetail(String day) {
+    final bucket = _days[day];
+    if (bucket == null) {
+      return <String, Map<String, List<int>>>{};
+    }
+    return <String, Map<String, List<int>>>{
+      'domains': bucket.domains,
+      'procs': bucket.procs,
+      'exits': bucket.exits,
+    };
+  }
+
+  List<String> get allDays {
+    final keys = _days.keys.toList()..sort();
+    return keys.reversed.toList();
+  }
+
+  String _snapshot() => jsonEncode(dataMap());
 
   void _startServer() {
     HttpServer.bind(InternetAddress.loopbackIPv4, port)
