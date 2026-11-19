@@ -13,6 +13,7 @@ import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/core/core.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/models/common.dart';
+import 'package:flutter/widgets.dart';
 import 'package:path/path.dart' as p;
 
 class _ConnMeta {
@@ -67,7 +68,7 @@ class _Bucket {
   }
 }
 
-class TrafficStats with CoreEventListener {
+class TrafficStats with CoreEventListener, WidgetsBindingObserver {
   TrafficStats._();
 
   static final TrafficStats instance = TrafficStats._();
@@ -108,9 +109,23 @@ class TrafficStats with CoreEventListener {
     _file = File(p.join(home, 'traffic_stats.json'));
     await _load();
     coreEventManager.addListener(this);
+    WidgetsBinding.instance.addObserver(this);
     _startServer();
-    _timer = Timer.periodic(const Duration(seconds: 15), (_) => _flush());
+    _timer = Timer.periodic(const Duration(seconds: 5), (_) => _flush());
     commonPrint.log('traffic stats started on 127.0.0.1:$port');
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    switch (state) {
+      case AppLifecycleState.paused:
+      case AppLifecycleState.hidden:
+      case AppLifecycleState.detached:
+        unawaited(_flush());
+      case AppLifecycleState.resumed:
+      case AppLifecycleState.inactive:
+        break;
+    }
   }
 
   Future<void> _load() async {
@@ -279,6 +294,7 @@ class TrafficStats with CoreEventListener {
 
   Future<void> stop() async {
     _timer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
     await _flush();
     await _server?.close(force: true);
   }
