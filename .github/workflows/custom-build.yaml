@@ -16,6 +16,8 @@ permissions:
 env:
   FLUTTER_VERSION: '3.47.6'
   GO_VERSION: '1.27.1'
+  PYTHONUTF8: '1'
+  PYTHONIOENCODING: 'utf-8'
 
 jobs:
   windows:
