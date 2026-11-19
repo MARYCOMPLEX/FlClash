@@ -132,7 +132,10 @@ class TrafficStats with CoreEventListener {
         });
       }
     } catch (error) {
-      commonPrint.log('traffic stats load failed: $error', logLevel: LogLevel.warning);
+      commonPrint.log(
+        'traffic stats load failed: $error',
+        logLevel: LogLevel.warning,
+      );
     }
   }
 
@@ -156,7 +159,10 @@ class TrafficStats with CoreEventListener {
       };
       await file.writeAsString(jsonEncode(payload), flush: true);
     } catch (error) {
-      commonPrint.log('traffic stats save failed: $error', logLevel: LogLevel.warning);
+      commonPrint.log(
+        'traffic stats save failed: $error',
+        logLevel: LogLevel.warning,
+      );
     }
   }
 
@@ -175,7 +181,9 @@ class TrafficStats with CoreEventListener {
   @override
   void onRequest(TrackerInfo connection) {
     final metadata = connection.metadata;
-    final host = metadata.host.isNotEmpty ? metadata.host : metadata.destinationIP;
+    final host = metadata.host.isNotEmpty
+        ? metadata.host
+        : metadata.destinationIP;
     final chains = connection.chains;
     _conns[connection.id] = _ConnMeta(
       host.isEmpty ? '(unknown)' : host,
@@ -238,30 +246,35 @@ class TrafficStats with CoreEventListener {
   }
 
   void _startServer() {
-    HttpServer.bind(InternetAddress.loopbackIPv4, port).then((server) {
-      _server = server;
-      server.listen((request) async {
-        try {
-          final response = request.response;
-          response.headers.set('Access-Control-Allow-Origin', '*');
-          if (request.uri.path == '/data') {
-            response.headers.contentType = ContentType.json;
-            response.write(_snapshot());
-          } else {
-            response.headers.contentType = ContentType.html;
-            response.write(trafficStatsHtml);
-          }
-          await response.close();
-        } catch (error) {
-          commonPrint.log('traffic stats http: $error', logLevel: LogLevel.warning);
-        }
-      });
-    }).catchError((Object error) {
-      commonPrint.log(
-        'traffic stats http bind failed: $error',
-        logLevel: LogLevel.warning,
-      );
-    });
+    HttpServer.bind(InternetAddress.loopbackIPv4, port)
+        .then((server) {
+          _server = server;
+          server.listen((request) async {
+            try {
+              final response = request.response;
+              response.headers.set('Access-Control-Allow-Origin', '*');
+              if (request.uri.path == '/data') {
+                response.headers.contentType = ContentType.json;
+                response.write(_snapshot());
+              } else {
+                response.headers.contentType = ContentType.html;
+                response.write(trafficStatsHtml);
+              }
+              await response.close();
+            } catch (error) {
+              commonPrint.log(
+                'traffic stats http: $error',
+                logLevel: LogLevel.warning,
+              );
+            }
+          });
+        })
+        .catchError((Object error) {
+          commonPrint.log(
+            'traffic stats http bind failed: $error',
+            logLevel: LogLevel.warning,
+          );
+        });
   }
 
   Future<void> stop() async {
