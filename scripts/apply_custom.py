@@ -18,15 +18,41 @@ for stream in (sys.stdout, sys.stderr):
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 MAIN = ROOT / "lib" / "main.dart"
+TOOLS = ROOT / "lib" / "views" / "tools.dart"
 
+# ---------- main.dart：启动统计服务 ----------
 IMPORT_LINE = "import 'custom/traffic_stats.dart';"
 IMPORT_ANCHOR = "import 'common/window.dart';"
 
 CALL_LINE = "        unawaited(startTrafficStats());"
 CALL_ANCHOR = "        final container = await bootstrap.init(version);"
 
+# ---------- views/tools.dart：设置里加「流量统计」入口 ----------
+TOOLS_IMPORT_LINE = "import 'package:fl_clash/custom/traffic_stats_view.dart';"
+TOOLS_IMPORT_ANCHOR = "import 'theme.dart';"
+
+TOOLS_ITEM_LINE = "        const _TrafficStatsItem(),"
+TOOLS_ITEM_ANCHOR = "        const _GeneralItem(),"
+
+TOOLS_CLASS = """
+
+class _TrafficStatsItem extends StatelessWidget {
+  const _TrafficStatsItem();
+
+  @override
+  Widget build(BuildContext context) {
+    return ListItem.open(
+      leading: const GlyphIcon(AppGlyphs.dashboard),
+      title: const Text('流量统计'),
+      widget: const TrafficStatsView(),
+    );
+  }
+}
+"""
+
 CUSTOM_FILES = [
     "lib/custom/traffic_stats.dart",
+    "lib/custom/traffic_stats_view.dart",
 ]
 
 
@@ -51,9 +77,7 @@ def patch_main():
     if IMPORT_LINE not in text:
         if IMPORT_ANCHOR not in text:
             fail("main.dart 里找不到 import 锚点：" + IMPORT_ANCHOR)
-        text = text.replace(
-            IMPORT_ANCHOR, IMPORT_ANCHOR + "\n" + IMPORT_LINE, 1
-        )
+        text = text.replace(IMPORT_ANCHOR, IMPORT_ANCHOR + "\n" + IMPORT_LINE, 1)
         changed = True
 
     if CALL_LINE.strip() not in text:
@@ -69,11 +93,49 @@ def patch_main():
         print("lib/main.dart 已是最新，跳过")
 
 
+def patch_tools():
+    if not TOOLS.exists():
+        fail("找不到 lib/views/tools.dart")
+    text = TOOLS.read_text(encoding="utf-8")
+    changed = False
+
+    if TOOLS_IMPORT_LINE not in text:
+        if TOOLS_IMPORT_ANCHOR not in text:
+            fail("tools.dart 里找不到 import 锚点：" + TOOLS_IMPORT_ANCHOR)
+        text = text.replace(
+            TOOLS_IMPORT_ANCHOR,
+            TOOLS_IMPORT_ANCHOR + "\n" + TOOLS_IMPORT_LINE,
+            1,
+        )
+        changed = True
+
+    if TOOLS_ITEM_LINE.strip() not in text:
+        if TOOLS_ITEM_ANCHOR not in text:
+            fail("tools.dart 里找不到菜单锚点：" + TOOLS_ITEM_ANCHOR)
+        text = text.replace(
+            TOOLS_ITEM_ANCHOR,
+            TOOLS_ITEM_LINE + "\n" + TOOLS_ITEM_ANCHOR,
+            1,
+        )
+        changed = True
+
+    if "_TrafficStatsItem extends StatelessWidget" not in text:
+        text = text.rstrip() + "\n" + TOOLS_CLASS
+        changed = True
+
+    if changed:
+        TOOLS.write_text(text, encoding="utf-8")
+        print("已注入 lib/views/tools.dart（设置 → 流量统计）")
+    else:
+        print("lib/views/tools.dart 已是最新，跳过")
+
+
 def main():
     print("工作目录：%s" % ROOT)
     ensure_custom_files()
     patch_main()
-    print("完成：自定义流量统计已就位（http://127.0.0.1:18999）")
+    patch_tools()
+    print("完成：客户端内「流量统计」页 + 网页版 http://127.0.0.1:18999")
 
 
 if __name__ == "__main__":
