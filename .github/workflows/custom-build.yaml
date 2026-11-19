@@ -103,3 +103,15 @@ jobs:
           name: flclash-windows-custom
           path: ./dist
           overwrite: true
+
+      # 只替换 app.so 做就地升级时用这个，几十 MB，比整包快得多
+      - name: Upload hot files (app.so + exe)
+        uses: actions/upload-artifact@v4
+        with:
+          name: flclash-hotfiles
+          path: |
+            build/windows/**/runner/Release/FlClash.exe
+            build/windows/**/runner/Release/data/app.so
+            build/windows/**/runner/Release/data/icudtl.dat
+          if-no-files-found: warn
+          overwrite: true
