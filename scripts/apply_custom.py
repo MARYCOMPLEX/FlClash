@@ -9,6 +9,13 @@
 import pathlib
 import sys
 
+# Windows runner 的 stdout 默认是 cp1252，直接 print 中文会炸
+for stream in (sys.stdout, sys.stderr):
+    try:
+        stream.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 MAIN = ROOT / "lib" / "main.dart"
 
