@@ -48,10 +48,22 @@ CALL_ANCHOR = "        final container = await bootstrap.init(version);"
 
 # ---------- action.dart：import core_hooks ----------
 ACTION_IMPORT_LINE = "import 'package:fl_clash/custom/core_hooks.dart';"
-ACTION_IMPORT_ANCHOR = "import 'package:fl_clash/common/system_dns.dart';"
+# 上游不同版本 import 区不一样，给多个候选，取第一个存在的（同步上游不至于挂）
+ACTION_IMPORT_ANCHORS = (
+    "import 'package:fl_clash/common/system_dns.dart';",
+    "import 'package:fl_clash/common/mitm_module.dart';",
+    "import 'package:fl_clash/core/core.dart';",
+)
 
 # ---------- setup.dart：配置下发前跑 hooks ----------
-SETUP_ANCHOR = "      rawConfig = await handleEvaluate(scriptContent!, rawConfig);"
+# 注意：上游是
+#     if (hasScript) {
+#       rawConfig = await handleEvaluate(scriptContent!, rawConfig);
+#     }
+# Dart 不看缩进，锚在 handleEvaluate 那一行会让插入的语句仍落在 if 块里，
+# 于是"没给 profile 挂 JS 覆写脚本"时整块跳过，hook 永远不执行（lastRun 恒为 null）。
+# 换成 if 块之后的独立语句做锚点，保证无条件执行。
+SETUP_ANCHOR = "    final directory = await appPath.profilesPath;"
 SETUP_LINE = "    rawConfig = await applyCoreHooks(rawConfig);"
 
 # ---------- tools.dart：菜单入口 ----------
@@ -59,7 +71,11 @@ TOOLS_IMPORT_LINES = (
     "import 'package:fl_clash/custom/core_hooks_view.dart';",
     "import 'package:fl_clash/custom/traffic_stats_view.dart';",
 )
-TOOLS_IMPORT_ANCHOR = "import 'theme.dart';"
+TOOLS_IMPORT_ANCHORS = (
+    "import 'theme.dart';",
+    "import 'package:fl_clash/widgets/widgets.dart';",
+    "import 'config/advanced.dart';",
+)
 TOOLS_ITEM_LINES = (
     "        const _CoreHooksItem(),",
     "        const _TrafficStatsItem(),",
@@ -101,6 +117,14 @@ def fail(message):
     sys.exit(1)
 
 
+def pick_anchor(text, anchors, what):
+    """多个候选锚点里挑第一个存在的，上游改版也不至于直接挂。"""
+    for a in anchors:
+        if a in text:
+            return a
+    fail(what + " 找不到任何可用锚点：" + " | ".join(anchors))
+
+
 def ensure_custom_files():
     missing = [f for f in CUSTOM_FILES if not (ROOT / f).exists()]
     if missing:
@@ -137,10 +161,9 @@ def patch_action():
     if ACTION_IMPORT_LINE in text:
         print("lib/providers/action.dart 已是最新")
         return
-    if ACTION_IMPORT_ANCHOR not in text:
-        fail("action.dart 找不到 import 锚点：" + ACTION_IMPORT_ANCHOR)
+    anchor = pick_anchor(text, ACTION_IMPORT_ANCHORS, "action.dart")
     text = text.replace(
-        ACTION_IMPORT_ANCHOR, ACTION_IMPORT_ANCHOR + "\n" + ACTION_IMPORT_LINE, 1
+        anchor, anchor + "\n" + ACTION_IMPORT_LINE, 1
     )
     ACTION.write_text(text, encoding="utf-8")
     print("已注入 lib/providers/action.dart")
@@ -168,9 +191,8 @@ def patch_tools():
 
     for line in TOOLS_IMPORT_LINES:
         if line not in text:
-            if TOOLS_IMPORT_ANCHOR not in text:
-                fail("tools.dart 找不到 import 锚点：" + TOOLS_IMPORT_ANCHOR)
-            text = text.replace(TOOLS_IMPORT_ANCHOR, TOOLS_IMPORT_ANCHOR + "\n" + line, 1)
+            anchor = pick_anchor(text, TOOLS_IMPORT_ANCHORS, "tools.dart")
+            text = text.replace(anchor, anchor + "\n" + line, 1)
             changed = True
 
     for line in TOOLS_ITEM_LINES:
