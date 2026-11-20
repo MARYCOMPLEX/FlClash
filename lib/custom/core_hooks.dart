@@ -166,6 +166,13 @@ return config;
     return list;
   }
 
+  /// 上游传下来的 config 可能是只读视图（Map.unmodifiable / 常量 map）。
+  /// JS 里 `config.rules = ...` 或 `rules.unshift(...)` 会抛
+  /// "Unsupported operation: Cannot modify unmodifiable map"，
+  /// 所以先深拷贝成可写结构，再交给脚本去改。
+  static Map<String, dynamic> _mutableCopy(Map<String, dynamic> config) =>
+      jsonDecode(jsonEncode(config)) as Map<String, dynamic>;
+
   /// 依次执行所有启用的 hook，任何单个 hook 出错只记录，不阻断内核启动
   Future<Map<String, dynamic>> apply(Map<String, dynamic> config) async {
     await load();
@@ -173,7 +180,7 @@ return config;
     if (list.isEmpty) {
       return config;
     }
-    var current = config;
+    var current = _mutableCopy(config);
     for (final hook in list) {
       final watch = Stopwatch()..start();
       try {
@@ -200,7 +207,7 @@ return config;
   Future<List<String>> dryRun(Map<String, dynamic> config) async {
     await load();
     final lines = <String>[];
-    var current = config;
+    var current = _mutableCopy(config);
     for (final hook in enabledHooks) {
       final watch = Stopwatch()..start();
       try {
