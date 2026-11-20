@@ -89,15 +89,27 @@ class CoreHooks {
   File? _file;
   bool _loaded = false;
 
-  static const String defaultScript = '''// config 是即将下发的内核配置对象，改完 return 回去
+  static const String defaultScript = '''// 约定：脚本必须定义 main(config)，config 是即将下发的内核配置（JS 对象），改完 return 回去。
+// 运行在 QuickJS 里（rust 侧 ctx.eval(script) 后调用 main(config)），顶层写 return 会报
+// "return not in a function"。
 // 这条默认 hook：把 Google 遥测上报端点直接拒绝，避免 Antigravity 的
 // language_server 疯狂重试上传（日志里 10 万次 POST play.googleapis.com/log）
-if (!config.rules) config.rules = [];
-const rule = "DOMAIN,play.googleapis.com,REJECT";
-if (config.rules.indexOf(rule) < 0) {
-  config.rules.unshift(rule);
+function main(config) {
+  var list = config.rules || (config.rules = []);
+  var block = [
+    "DOMAIN,play.googleapis.com,REJECT",
+    "DOMAIN-SUFFIX,firebaselogging.googleapis.com,REJECT",
+    "DOMAIN-SUFFIX,app-measurement.com,REJECT",
+    "DOMAIN-SUFFIX,google-analytics.com,REJECT",
+    "DOMAIN-SUFFIX,analytics.google.com,REJECT",
+    "DOMAIN,clients3.google.com,REJECT",
+    "DOMAIN-SUFFIX,firebaseinstallations.googleapis.com,REJECT"
+  ];
+  for (var i = block.length - 1; i >= 0; i--) {
+    if (list.indexOf(block[i]) < 0) list.unshift(block[i]);
+  }
+  return config;
 }
-return config;
 ''';
 
   Future<void> load() async {
